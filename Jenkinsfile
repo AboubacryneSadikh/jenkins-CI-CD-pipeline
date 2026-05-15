@@ -128,9 +128,11 @@ pipeline {
         // ─────────────────────────────────────────────
         stage('Push Docker Hub') {
             when {
-                anyOf {
-                    branch 'main'
-                    branch 'master'
+                expression {
+                    return env.GIT_BRANCH == 'origin/main' ||
+                           env.GIT_BRANCH == 'origin/master' ||
+                           env.BRANCH_NAME == 'main' ||
+                           env.BRANCH_NAME == 'master'
                 }
             }
             steps {
@@ -156,9 +158,11 @@ pipeline {
         // ─────────────────────────────────────────────
         stage('Déploiement') {
             when {
-                anyOf {
-                    branch 'main'
-                    branch 'master'
+                expression {
+                    return env.GIT_BRANCH == 'origin/main' ||
+                           env.GIT_BRANCH == 'origin/master' ||
+                           env.BRANCH_NAME == 'main' ||
+                           env.BRANCH_NAME == 'master'
                 }
             }
             steps {
