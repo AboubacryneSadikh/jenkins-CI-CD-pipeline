@@ -2,130 +2,63 @@ pipeline {
     agent any
 
     environment {
-        // Credentials Docker Hub configurés dans Jenkins (ID à adapter)
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
         DOCKERHUB_USERNAME    = "${DOCKERHUB_CREDENTIALS_USR}"
-
-        // Noms des images
-        BACKEND_IMAGE  = "${DOCKERHUB_USERNAME}/portfolio-backend"
-        FRONTEND_IMAGE = "${DOCKERHUB_USERNAME}/portfolio-frontend"
-
-        // Tag basé sur le numéro de build Jenkins
-        IMAGE_TAG = "build-${BUILD_NUMBER}"
+        BACKEND_IMAGE         = "${DOCKERHUB_USERNAME}/portfolio-backend"
+        FRONTEND_IMAGE        = "${DOCKERHUB_USERNAME}/portfolio-frontend"
+        IMAGE_TAG             = "build-${BUILD_NUMBER}"
     }
 
     options {
-        // Conserver les 5 derniers builds
         buildDiscarder(logRotator(numToKeepStr: '5'))
-        // Timeout global du pipeline
         timeout(time: 30, unit: 'MINUTES')
-        // Pas de builds parallèles sur la même branche
         disableConcurrentBuilds()
     }
 
     stages {
 
-        // ─────────────────────────────────────────────
-        // 1. CHECKOUT
-        // ─────────────────────────────────────────────
         stage('Checkout') {
             steps {
-                echo '📥 Récupération du code source...'
                 checkout scm
             }
         }
 
-        // ─────────────────────────────────────────────
-        // 2. LINT / AUDIT (optionnel mais recommandé)
-        // ─────────────────────────────────────────────
-        stage('Audit dépendances') {
-            parallel {
-                stage('Audit Backend') {
-                    steps {
-                        dir('backend') {
-                            echo '🔍 Audit npm backend...'
-                            sh 'npm audit --audit-level=high || true'
-                        }
-                    }
-                }
-                stage('Audit Frontend') {
-                    steps {
-                        dir('frontend') {
-                            echo '🔍 Audit npm frontend...'
-                            sh 'npm audit --audit-level=high || true'
-                        }
-                    }
-                }
-            }
-        }
-
-        // ─────────────────────────────────────────────
-        // 3. BUILD DES IMAGES DOCKER
-        // ─────────────────────────────────────────────
         stage('Build Images Docker') {
             parallel {
                 stage('Build Backend') {
                     steps {
-                        echo "🐳 Build image backend : ${BACKEND_IMAGE}:${IMAGE_TAG}"
-                        sh """
-                            docker build \
-                                -t ${BACKEND_IMAGE}:${IMAGE_TAG} \
-                                -t ${BACKEND_IMAGE}:latest \
-                                ./backend
-                        """
+                        sh "docker build -t ${BACKEND_IMAGE}:${IMAGE_TAG} -t ${BACKEND_IMAGE}:latest ./backend"
                     }
                 }
                 stage('Build Frontend') {
                     steps {
-                        echo "🐳 Build image frontend : ${FRONTEND_IMAGE}:${IMAGE_TAG}"
-                        sh """
-                            docker build \
-                                -t ${FRONTEND_IMAGE}:${IMAGE_TAG} \
-                                -t ${FRONTEND_IMAGE}:latest \
-                                ./frontend
-                        """
+                        sh "docker build -t ${FRONTEND_IMAGE}:${IMAGE_TAG} -t ${FRONTEND_IMAGE}:latest ./frontend"
                     }
                 }
             }
         }
 
-        // ─────────────────────────────────────────────
-        // 4. TEST DE SANTÉ DES CONTENEURS
-        // ─────────────────────────────────────────────
         stage('Test conteneurs') {
             steps {
-                echo '🧪 Vérification du démarrage des conteneurs...'
-                sh '''
-                    # Démarrer le backend en mode test (sans MongoDB réel)
+                sh """
                     docker run -d --name test-backend \
                         -e PORT=5000 \
                         -e MONGODB_URI=mongodb://localhost:27017/test \
                         -e NODE_ENV=test \
                         -p 5001:5000 \
                         ${BACKEND_IMAGE}:${IMAGE_TAG}
-
-                    # Attendre que le conteneur soit prêt (max 20s)
                     sleep 10
-
-                    # Vérifier que le conteneur tourne toujours
-                    docker inspect test-backend --format="{{.State.Status}}" | grep -q "running"
-                    echo "✅ Backend container OK"
-                '''
+                    docker inspect test-backend --format='{{.State.Status}}' | grep -q running
+                    echo '✅ Backend container OK'
+                """
             }
             post {
                 always {
-                    sh '''
-                        docker stop test-backend 2>/dev/null || true
-                        docker rm  test-backend 2>/dev/null || true
-                    '''
+                    sh 'docker stop test-backend 2>/dev/null || true; docker rm test-backend 2>/dev/null || true'
                 }
             }
         }
 
-        // ─────────────────────────────────────────────
-        // 5. PUSH SUR DOCKER HUB
-        //    (uniquement sur main/master)
-        // ─────────────────────────────────────────────
         stage('Push Docker Hub') {
             when {
                 expression {
@@ -136,7 +69,6 @@ pipeline {
                 }
             }
             steps {
-                echo '🚀 Push des images sur Docker Hub...'
                 sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
                 sh """
                     docker push ${BACKEND_IMAGE}:${IMAGE_TAG}
@@ -146,16 +78,10 @@ pipeline {
                 """
             }
             post {
-                always {
-                    sh 'docker logout'
-                }
+                always { sh 'docker logout' }
             }
         }
 
-        // ─────────────────────────────────────────────
-        // 6. DÉPLOIEMENT
-        //    (uniquement sur main/master)
-        // ─────────────────────────────────────────────
         stage('Déploiement') {
             when {
                 expression {
@@ -166,27 +92,19 @@ pipeline {
                 }
             }
             steps {
-                echo '🎯 Déploiement via docker compose...'
                 sh '''
-                    # Installer docker compose v2 si absent (dans le home user, sans root)
                     if ! docker compose version > /dev/null 2>&1; then
-                        echo "📦 Installation de docker compose v2..."
                         mkdir -p "${HOME}/.docker/cli-plugins"
                         curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64" \
                             -o "${HOME}/.docker/cli-plugins/docker-compose"
                         chmod +x "${HOME}/.docker/cli-plugins/docker-compose"
-                        echo "✅ docker compose installé : $(docker compose version)"
-                    else
-                        echo "✅ docker compose déjà disponible : $(docker compose version)"
                     fi
                 '''
                 sh """
-                    # Mettre à jour les images et redémarrer les services
                     BACKEND_IMAGE=${BACKEND_IMAGE}:${IMAGE_TAG} \
                     FRONTEND_IMAGE=${FRONTEND_IMAGE}:${IMAGE_TAG} \
                     docker compose down --remove-orphans || true
 
-                    # Supprimer les conteneurs en conflit de nom
                     docker rm -f db-mongo portfolio-backend portfolio-frontend 2>/dev/null || true
 
                     BACKEND_IMAGE=${BACKEND_IMAGE}:${IMAGE_TAG} \
@@ -198,27 +116,15 @@ pipeline {
 
     }
 
-    // ─────────────────────────────────────────────
-    // POST — Nettoyage & Notifications
-    // ─────────────────────────────────────────────
     post {
         always {
-            echo '🧹 Nettoyage des images Docker locales...'
             sh """
-                docker rmi ${BACKEND_IMAGE}:${IMAGE_TAG}  2>/dev/null || true
+                docker rmi ${BACKEND_IMAGE}:${IMAGE_TAG} 2>/dev/null || true
                 docker rmi ${FRONTEND_IMAGE}:${IMAGE_TAG} 2>/dev/null || true
                 docker image prune -f
             """
         }
-        success {
-            echo "✅ Pipeline réussi — Build #${BUILD_NUMBER}"
-        }
-        failure {
-            echo "❌ Pipeline échoué — Build #${BUILD_NUMBER}"
-            // Décommenter pour activer les notifications email :
-            // mail to: 'ton-email@example.com',
-            //      subject: "❌ Jenkins Build #${BUILD_NUMBER} échoué",
-            //      body: "Voir les logs : ${BUILD_URL}"
-        }
+        success { echo "✅ Pipeline réussi — Build #${BUILD_NUMBER}" }
+        failure { echo "❌ Pipeline échoué — Build #${BUILD_NUMBER}" }
     }
 }
