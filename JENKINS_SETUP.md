@@ -61,8 +61,8 @@
 | `IMAGE_TAG`            | Tag = `build-<numéro_build>`             |
 
 ---
-
-## 5. Notifications email (optionnel)
+## 5. Ajout de webhooks
+## 6. Notifications email (optionnel)
 
 Décommenter dans le `Jenkinsfile` la section `mail` dans le bloc `post > failure`,
 et configurer le serveur SMTP dans :
