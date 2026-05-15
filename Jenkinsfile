@@ -168,13 +168,13 @@ pipeline {
             steps {
                 echo '🎯 Déploiement via docker compose...'
                 sh '''
-                    # Installer docker compose v2 si absent
+                    # Installer docker compose v2 si absent (dans le home user, sans root)
                     if ! docker compose version > /dev/null 2>&1; then
                         echo "📦 Installation de docker compose v2..."
-                        mkdir -p /usr/local/lib/docker/cli-plugins
+                        mkdir -p "${HOME}/.docker/cli-plugins"
                         curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64" \
-                            -o /usr/local/lib/docker/cli-plugins/docker-compose
-                        chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+                            -o "${HOME}/.docker/cli-plugins/docker-compose"
+                        chmod +x "${HOME}/.docker/cli-plugins/docker-compose"
                         echo "✅ docker compose installé : $(docker compose version)"
                     else
                         echo "✅ docker compose déjà disponible : $(docker compose version)"
