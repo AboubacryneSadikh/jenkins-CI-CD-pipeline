@@ -184,6 +184,10 @@ pipeline {
                     # Mettre à jour les images et redémarrer les services
                     BACKEND_IMAGE=${BACKEND_IMAGE}:${IMAGE_TAG} \
                     FRONTEND_IMAGE=${FRONTEND_IMAGE}:${IMAGE_TAG} \
+                    docker compose down --remove-orphans || true
+
+                    BACKEND_IMAGE=${BACKEND_IMAGE}:${IMAGE_TAG} \
+                    FRONTEND_IMAGE=${FRONTEND_IMAGE}:${IMAGE_TAG} \
                     docker compose up -d --pull always --remove-orphans
                 """
             }
