@@ -166,7 +166,20 @@ pipeline {
                 }
             }
             steps {
-                echo '🎯 Déploiement via docker-compose...'
+                echo '🎯 Déploiement via docker compose...'
+                sh '''
+                    # Installer docker compose v2 si absent
+                    if ! docker compose version > /dev/null 2>&1; then
+                        echo "📦 Installation de docker compose v2..."
+                        mkdir -p /usr/local/lib/docker/cli-plugins
+                        curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64" \
+                            -o /usr/local/lib/docker/cli-plugins/docker-compose
+                        chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+                        echo "✅ docker compose installé : $(docker compose version)"
+                    else
+                        echo "✅ docker compose déjà disponible : $(docker compose version)"
+                    fi
+                '''
                 sh """
                     # Mettre à jour les images et redémarrer les services
                     BACKEND_IMAGE=${BACKEND_IMAGE}:${IMAGE_TAG} \
