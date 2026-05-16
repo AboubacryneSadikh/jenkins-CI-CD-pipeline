@@ -50,6 +50,7 @@ pipeline {
                     sleep 10
                     docker inspect test-backend --format='{{.State.Status}}' | grep -q running
                     echo '✅ Backend container OK'
+                    echo '✅ Backend container OK2'
                 """
             }
             post {
@@ -125,6 +126,11 @@ pipeline {
             """
         }
         success { echo "✅ Pipeline réussi — Build #${BUILD_NUMBER}" }
-        failure { echo "❌ Pipeline échoué — Build #${BUILD_NUMBER}" }
+        failure {
+            echo "❌ Pipeline échoué — Build #${BUILD_NUMBER}"
+            mail to: 'ton-email@gmail.com',
+                 subject: "❌ Jenkins Build #${BUILD_NUMBER} échoué",
+                 body: "Le pipeline a échoué.\n\nVoir les logs : ${BUILD_URL}"
+        }
     }
 }
