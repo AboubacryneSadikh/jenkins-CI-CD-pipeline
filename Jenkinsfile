@@ -50,7 +50,6 @@ pipeline {
                     sleep 10
                     docker inspect test-backend --format='{{.State.Status}}' | grep -q running
                     echo '✅ Backend container OK'
-                    echo '✅ Backend container OK2'
                 """
             }
             post {
