@@ -59,24 +59,21 @@ pipeline {
             }
         }
 
-         // ✅ Étape SonarQube
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube') {
-                    sh 'mvn sonar:sonar'
-                    // Pour JS: sh 'sonar-scanner'
-                    // Pour Python: sh 'sonar-scanner'
+                    sh 'sonar-scanner'
                 }
             }
         }
 
-        // ✅ Attendre le Quality Gate
         stage('Quality Gate') {
             steps {
                 timeout(time: 2, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
             }
+        }  // ✅ Accolade ajoutée ici
 
         stage('Push Docker Hub') {
             when {
