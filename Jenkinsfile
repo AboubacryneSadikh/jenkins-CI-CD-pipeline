@@ -62,7 +62,10 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube') {
-                    sh 'sonar-scanner'
+                    script {
+                        def scannerHome = tool 'SonarScanner' // doit correspondre au nom configuré dans Jenkins Tools
+                        sh "${scannerHome}/bin/sonar-scanner"
+                    }
                 }
             }
         }
